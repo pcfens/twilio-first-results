@@ -88,6 +88,7 @@ def gather():
 
         r.say(message.format(**string_data))
 
+    r.say('Goodbye')
     r.hangup()
     return str(r)
 
