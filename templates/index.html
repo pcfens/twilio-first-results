@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>FIRST Results by Phone</title>
+</head>
+<body>
+  <h1><em>FIRST</em> Results by Phone</h1>
+  <p>At a <em>FIRST</em> Robotics competition it can be hard to get the latest match information without walking
+  to the pits, or using a smartphone. Even though smartphones are everywhere, many of the primary 
+  participants in <em>FIRST</em> don't have smartphones.</p>
+
+  <p>Call or text the phone number <strong>804-505-2659</strong> to find out about the team.</p>
+  
+  <p>Chances are you're reading this because someone on the <a href="http://firstteam1137.com">Mathews Robotics team</a>
+  sent it to you.  They're team 1137, and will be playing in the qualifying rounds on Friday, March 21 and Saturday, March 22.
+  Normal text and phone call rates apply to using the service, but the number is supposedly a local Mathews phone number so that
+  families can find out how the team is doing without calling long distance (though we encourage texting to get the most info).</p>
+
+
+  <h2>SMS</h2>
+  <p>Send a team number and we'll quickly respond with information about that team from
+  the {{event.name}}.</p>
+  <h2>Call</h2>
+  <p>Call and follow the instructions.  We'll read back to you almost everything we send in an SMS message.</p>
+
+  <h2>Caveats</h2>
+  <p>We don't have information about practice rounds (usually played on the Thursday of competition) because <em>FIRST</em>
+  doesn't publish that information on the web.</p>
+
+  <hr />
+  <h2>Technical FAQs</h2>
+  <h3>I found a bug. Can you fix it?</h3>
+  <p>Please file an issue on <a href="https://github.com/pcfens/twilio-first-results">GitHub</a> and include as much
+  information as possible.</p>
+  <h3>How do you interact with phones?</h3>
+  <p>We use the <a href="http://twilio.com">twilio</a> API.
+  <h3>Where does your data come from?</h3>
+  <p>We get our initial data from <a href="http://www.thebluealliance.com">The Blue Alliance</a>, then pull
+  data directly from <em>FIRST</em> during the matches (once every minute) to give you the most up to date information possible.</p>
+  <h3>Can I get the source?</h3>
+  <p>Absolutely.  The project is hosted on <a href="https://github.com/pcfens/twilio-first-results">GitHub</a>.
+  If you put something together that others might benefit from, please send a pull request and I'll do my best
+  to get your code in the version I maintain.</p>
+  <h3>I saw the source code and it's really ugly. Is this how you code?</h3>
+  <p>No. I came up with this idea and decided to write it using some tools that were new to me (Heroku, Flask, twilio-python), in the
+  week before the team I mentor (<a href="http://firstteam1137.com">1137</a>) went to regionals.  Hopefully I'll get a chance
+  to clean things up sometime soon.</p>
+  <h3>Any other features planned?</h3>
+  <p>I really want to have a basic web interface up and running before the Virginia Regional, but I can't promise that will
+  happen.</p>
+  <h3>How can I get in touch with you?</h3>
+  <p><a href="mailto:phillip.fenstermacher+first@gmail.com">E-Mail</a> me.</p>
+</body>
+</html>
