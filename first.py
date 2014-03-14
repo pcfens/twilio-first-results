@@ -30,7 +30,8 @@ def voice():
     with r.gather(action='/gather', finishOnKey='#', timeout='7', numDigits='4') as g:
         g.say('Enter the team number you want to know about, then press pound.')
     r.pause()
-    r.redirect('/voice')
+    r.say('Goodbye')
+    r.hangup()
     return str(r)
 
 @app.route('/gather', methods=['POST'])
