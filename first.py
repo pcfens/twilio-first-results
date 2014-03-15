@@ -29,7 +29,7 @@ def harvest():
 def voice():
     r = twiml.Response()
     r.say('Hello.')
-    with r.gather(action='/gather', finishOnKey='#', timeout='7', numDigits='4') as g:
+    with r.gather(action='/gather', finishOnKey='#', timeout='5') as g:
         g.say('Enter the team number you want to know about, then press pound.')
     r.pause()
     r.say('Goodbye')
@@ -39,6 +39,7 @@ def voice():
 @app.route('/gather', methods=['POST'])
 def gather():
     r = twiml.Response()
+    r.pause()
     message = request.form['Digits']
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
     info = data.get_full_team_info(int(message), FIRST_EVENT)
