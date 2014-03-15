@@ -6,8 +6,6 @@ from twilio import twiml
 from first_results import first_results
 from local_settings import *
 
-import pprint
-
 app = Flask(__name__, static_url_path='/static')
  
 @app.route('/')
