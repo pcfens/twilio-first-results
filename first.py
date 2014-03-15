@@ -6,6 +6,8 @@ from twilio import twiml
 from first_results import first_results
 from local_settings import *
 
+import pprint
+
 app = Flask(__name__, static_url_path='/static')
  
 @app.route('/')
@@ -40,10 +42,11 @@ def gather():
     message = request.form['Digits']
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
     info = data.get_full_team_info(int(message), FIRST_EVENT)
+
     if info['matches'] == []:
         r.say('It looks like team ' + number_to_speech(message) + ' isn\'t registered for this event ('+FIRST_EVENT+')')
 
-    if info['next_match']:
+    elif info['next_match']:
         string_data = dict()
         string_data['team_num'] = number_to_speech(message)
         string_data['rank'] = info['ranking']['rank']
@@ -97,15 +100,14 @@ def gather():
 def sms():
     r = twiml.Response()
     message = request.form['Body'].lower()
-
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
     if re.search('^\d{0,4}$', message):
         info = data.get_full_team_info(int(message), FIRST_EVENT)
+
         if info['matches'] == []:
             r.sms('It looks like team ' + message + ' isn\'t registered for this event ('+FIRST_EVENT+')')
-            r.hangup()
 
-        if info['next_match']:
+        elif info['next_match']:
             string_data = dict()
             string_data['team_num'] = message
             string_data['record'] = info['ranking']['record']
@@ -149,6 +151,7 @@ def sms():
             message = message + "have any data on the elimination matches."
 
             r.sms(message.format(**string_data))
+
         return str(r)
 
 
