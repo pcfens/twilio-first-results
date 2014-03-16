@@ -47,7 +47,7 @@ class first_results:
                     db_rankings.update({'_id': team['_id']}, team, upsert=True)
             return teams
         else:
-            return list(db_rankings.find({'event': str(year) + event}))
+            return list(db_rankings.find({'event': str(year) + event}).sort('rank', 1))
 
     def get_results(self, event, year=2014, from_web=False):
         matches = []

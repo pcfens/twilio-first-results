@@ -22,7 +22,13 @@ def get_team_stats(team_number):
         return render_template('team_stats.html', info=info, team_number=team_number)
     else:
         return "Data for team " + str(team_number) + " isn't available for this event (" + FIRST_EVENT + ")"
-    
+
+@app.route('/rankings')
+def rankings():
+    data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
+    rankings = data.get_rankings(FIRST_EVENT, year='')
+    return render_template('rankings.html', rankings=rankings)
+
 @app.route('/harvest')
 def harvest():
     try:
