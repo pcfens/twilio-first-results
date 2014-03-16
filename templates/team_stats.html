@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Team {{team_number}} Information</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <h1>Team {{ team_number }} Information</h1>
+  <h2>General Information</h2>
+  <table>
+    <tr>
+      <td class="label"><strong>Rank:</strong></td>
+      <td>{{ info.ranking.rank }}</td>
+    </tr>
+    <tr>
+      <td class="label"><strong>Record:</strong></td>
+      <td>{{ info.ranking.record }}</td>
+    </tr>
+    <tr>
+      <td class="label"><strong>Matches Played:</strong></td>
+      <td>{{ info.ranking.played }}</td>
+    </tr>
+    <tr>
+      <td class="label"><strong>Disqualifications:</strong></td>
+      {%- if info.ranking.dq > 0 %}
+      <td>{{ info.ranking.dq }}</td>
+      {%- else %}
+      <td class="critical">{{ info.ranking.dq }}</td>
+      {%- endif %}
+    </tr>
+  </table>
+  <h2>Matches</h2>
+  <table cellspacing="0" border="1">
+    <tr>
+      <th>Time</th>
+      <th>Match Number</th>
+      <th>Red Alliance</th>
+      <th>Red Score</th>
+      <th>Blue Alliance</th>
+      <th>Blue Score</th>
+      <th>Result</th>
+    </tr>
+    {%- for match in info.matches %}
+    {%- set result = '' %}
+    <tr>
+      <td>{{match.time.strftime('%I:%M %p')}}</td>
+      {%- if team_number in match.red %}
+      <td class="red">{{match.number}}</td>
+      {%- if match.red_score > match.blue_score %}
+        {%- set result = 'W' %}
+      {%- elif match.red_score < match.blue_score %}
+        {%- set result = 'L' %}
+      {%- endif %}
+      {%- else %}
+      <td class="blue">{{match.number}}</td>
+      {%- if match.red_score > match.blue_score %}
+        {%- set result = 'L' %}
+      {%- elif match.red_score < match.blue_score %}
+        {%- set result = 'W' %}
+      {%- endif %}
+      {%- endif %}
+      <td>
+        {%- for team in match.red %}
+          <a href="{{ url_for('get_team_stats', team_number=team) }}">{{team}}</a>
+        {%- endfor %}
+      </td>
+      {%- if match.red_score > -1 %}
+      <td>{{match.red_score}}</td>
+      {%- else %}
+      <td></td>
+      {%- endif %}
+      <td>
+        {%- for team in match.blue %}
+          <a href="/{{team}}">{{team}}</a>
+        {%- endfor %}
+      </td>
+      {%- if match.blue_score > -1 %}
+      <td>{{match.blue_score}}</td>
+      {%- else %}
+      <td></td>
+      {%- endif %}
+      <td>{{ result }}</td>
+    </tr>
+    {%- endfor %}
+  </table>
+</body>
+</html>

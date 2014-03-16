@@ -1,0 +1,16 @@
+td.label {
+  text-align:right;
+  font-weight:bold;
+}
+
+td.critical {
+  color:red;
+}
+
+td.red {
+  color:red;
+}
+
+td.blue {
+  color:blue;
+}
