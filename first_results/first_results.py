@@ -3,6 +3,7 @@ import requests
 from datetime import datetime, timedelta
 import re
 import pymongo
+import pprint
 
 class first_results:
 
@@ -52,7 +53,6 @@ class first_results:
     def get_results(self, event, year=2014, from_web=False):
         matches = []
         matches = self.db.matches
-        
         if from_web:
             qual_url = 'http://www2.usfirst.org/' + str(year) + 'comp/events/' + event + '/matchresults.html'
             try:
@@ -96,9 +96,34 @@ class first_results:
                     match['blue'] = [int(tds[5].string), int(tds[6].string), int(tds[7].string)]
                     match['red_score'] = int(tds[8].string) if tds[8].string != None else -1
                     match['blue_score'] = int(tds[9].string) if tds[9].string != None else -1
+                    match['type'] = 'Q'
                     match['_id'] = str(year) + '-' + event + '-' + str(match['number'])
                     matches.update({'_id': match['_id']}, match, upsert=True)
                     match_list.append(match)
+
+            meridian = None
+
+            if len(tables) > 3:
+                for tr in tables[3].findAll('tr')[3:]:
+                    match = dict()
+                    tds = tr.findAll('td')
+                    if tds[0].string != None:
+                        match['time'] = datetime.strptime(tds[0].string + ' ' + current_date.strftime('%d/%m/%Y'), '%I:%M %p %d/%m/%Y')
+                        if match['time'].strftime('%p') == 'AM' and  meridian == 'PM':
+                            current_date = current_date + timedelta(days=1)
+                            match['time'] = datetime.strptime(tds[0].string + ' ' + current_date.strftime('%d/%m/%Y'), '%I:%M %p %d/%m/%Y')
+                        meridian = match['time'].strftime('%p')
+                        match['event'] = match['time'].strftime('%Y') + event
+                        match['number'] = tds[1].string
+                        match['red'] = [int(tds[3].string), int(tds[4].string), int(tds[5].string)]
+                        match['blue'] = [int(tds[6].string), int(tds[7].string), int(tds[8].string)]
+                        match['red_score'] = int(tds[9].string) if tds[9].string != None else -1
+                        match['blue_score'] = int(tds[10].string) if tds[10].string != None else -1
+                        match['type'] = 'E'
+                        match['_id'] = str(year) + '-' + event + '-' + str(match['number'])
+                        matches.update({'_id': match['_id']}, match, upsert=True)
+                        match_list.append(match)
+
             return match_list
         else:
             return list(matches.find({'event': int(year) + event}))
@@ -176,10 +201,18 @@ class first_results:
         else:
             return unplayed_matches[0]
 
+    def get_last_team_match(self, team, event):
+        played_matches = list(self.db.matches.find({'$and': [ { '$or': [ { 'red': {'$in': [team]} },{ 'blue': { '$in': [team]} } ] }, {'event': event}, {'red_score': {'$gt': -1}}] }).sort('time', -1))
+        if len(played_matches) == 0:
+            return None
+        else:
+            return played_matches[0]
+
     def get_full_team_info(self, team, event):
         info = dict()
         info['ranking'] = self.get_team_ranking(team, event)
         info['matches'] = self.get_team_matches(team, event)
         info['next_match'] = self.get_next_team_match(team, event)
+        info['last_match'] = self.get_last_team_match(team, event)
         return info
 
