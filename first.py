@@ -33,7 +33,7 @@ def rankings():
 def harvest():
     try:
         data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
-        data.fetch_all_data(get_events=True)
+        data.fetch_all_data()
         return 'All fetched'
     except:
         abort(500)
