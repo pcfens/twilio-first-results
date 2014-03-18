@@ -73,11 +73,12 @@ def gather():
         r.say(message.format(**string_data))
 
     if info['last_match']:
-        message = "Team {team_num!s} {result!s} match {match_num!s}, {score!s}."
+        message = "In their last match, number {match_num!s}, team {team_num_speech!s} {result!s}, {score!s}. "
+        r.say(message.format(**string_data))
         
     r.say('Goodbye')
     r.hangup()
-    return ster(r)
+    return str(r)
 
 
 @app.route('/sms', methods=['POST'])
