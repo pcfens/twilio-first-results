@@ -33,7 +33,7 @@ def rankings():
 def harvest():
     try:
         data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
-        data.fetch_all_data()
+        data.fetch_all_data(get_events=True)
         return 'All fetched'
     except:
         abort(500)
@@ -42,20 +42,21 @@ def harvest():
 def voice():
     r = twiml.Response()
     r.say('Hello.')
-    with r.gather(action='/gather', finishOnKey='#', timeout='5') as g:
+    with r.gather(action='/process_call', finishOnKey='#', timeout='5') as g:
         g.say('Enter the team number you want to know about, then press pound.')
     r.pause()
     r.say('Goodbye')
     r.hangup()
     return str(r)
 
-@app.route('/gather', methods=['POST'])
-def gather():
+@app.route('/process_call', methods=['POST'])
+def process_call():
     r = twiml.Response()
     r.pause()
     message = request.form['Digits']
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
     info = data.get_full_team_info(int(message), FIRST_EVENT)
+    elim_matches = data.count_elimination_matches(FIRST_EVENT)
     string_data = get_words(int(message), info)
 
     if info['matches'] == []:
@@ -66,18 +67,26 @@ def gather():
         message = message + "They will be paired with teams {ally_0_speech!s} and {ally_1_speech!s}. "
         message = message + "The opposing alliance will be made up of teams {opp_0_speech!s} and {opp_1_speech!s} and {opp_2_speech!s}. "
         r.say(message.format(**string_data))
-    else:
+
+    elif elim_matches > 0:
         message = "Team {team_num_speech!s} is ranked {rank!s} out of {total_teams!s}. "
-        message = message + "They aren't listed as playing any more matches. "
+        message = message + "They aren't listed as playing any more matches and elimination matches have been scheduled. "
         message = message + "This usually means that the aren't playing in elimination matches. "
         r.say(message.format(**string_data))
 
+    elif elim_matches == 0:
+        message = "Team {team_num_speech!s} is ranked {rank!s} out of {total_teams!s}. "
+        message = message + "They aren't listed as playing any more matches, but data isn't yet available for elimination matches. "
+        message = message + "Check back later to find out if they're playing again. "
+        r.say(message.format(**string_data)) 
+
     if info['last_match']:
-        message = "Team {team_num!s} {result!s} match {match_num!s}, {score!s}."
+        message = "In their last match, number {match_num!s}, team {team_num_speech!s} {result!s}, {score!s}. "
+        r.say(message.format(**string_data))
         
     r.say('Goodbye')
     r.hangup()
-    return ster(r)
+    return str(r)
 
 
 @app.route('/sms', methods=['POST'])
@@ -87,6 +96,7 @@ def sms():
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
     if re.search('^\d{0,4}$', message):
         info = data.get_full_team_info(int(message), FIRST_EVENT)
+    	elim_matches = data.count_elimination_matches(FIRST_EVENT)
         string_data = get_words(int(message), info)
         if info['matches'] == []:
             r.sms('Either team ' + message + ' isn\'t registered for this event, or FIRST hasn\'t published match data yet. ('+FIRST_EVENT+')')
@@ -95,10 +105,15 @@ def sms():
             message = message + "They play next in match {next_match!s} ({next_time!s}) on the {next_alliance!s} alliance "
             message = message + "(w/ {ally_0!s}, {ally_1!s}; vs {opp_0!s}, {opp_1!s}, {opp_2!s})."
             r.sms(message.format(**string_data))
-        else:
+        elif elim_matches > 0:
             message = "Team {team_num!s} ({record!s}) is ranked #{rank!s}/{total_teams!s}. "
             message = message + "They\'re not on the schedule to play anymore matches. "
-            message = message + "They played last in match {last_num!s}."
+            message = message + "Elimination rounds have already been scheduled."
+            r.sms(message.format(**string_data))
+        elif elim_matches == 0:
+            message = "Team {team_num!s} ({record!s}) is ranked #{rank!s}/{total_teams!s}. "
+            message = message + "They\'re not on the schedule to play anymore matches. "
+            message = message + "Elimination rounds have not been scheduled."
             r.sms(message.format(**string_data))
 
     elif re.search('^\d{0,4} last$', message):
