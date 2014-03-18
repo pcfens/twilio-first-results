@@ -56,58 +56,28 @@ def gather():
     message = request.form['Digits']
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
     info = data.get_full_team_info(int(message), FIRST_EVENT)
+    string_data = get_words(int(message), info)
 
     if info['matches'] == []:
         r.say('It looks like team ' + number_to_speech(message) + ' isn\'t registered for this event ('+FIRST_EVENT+')')
-
     elif info['next_match']:
-        string_data = dict()
-        string_data['team_num'] = number_to_speech(message)
-        string_data['rank'] = info['ranking']['rank']
-        string_data['next_match'] = info['next_match']['number']
-        string_data['next_time'] = info['next_match']['time'].strftime('%I:%M %p')
-
-        if int(message) in info['next_match']['red']:
-            string_data['next_alliance'] = 'red'
-            opp_alliance = 'blue'
-        else:
-            string_data['next_alliance'] = 'blue'
-            opp_alliance = 'red'
-
-        allies = info['next_match'][string_data['next_alliance']]
-        allies.remove(int(message))
-        opps = info['next_match'][opp_alliance]
-
-        string_data['ally_0'] = number_to_speech(allies[0])
-        string_data['ally_1'] = number_to_speech(allies[1])
-        string_data['opp_0'] = number_to_speech(opps[0])
-        string_data['opp_1'] = number_to_speech(opps[1])
-        string_data['opp_2'] = number_to_speech(opps[2])
-        string_data['total_teams'] = len(data.get_rankings(FIRST_EVENT, year=''))
-
-        message = "Team {team_num!s} is ranked number {rank!s} out of {total_teams!s} teams. "
+        message = "Team {team_num_speech!s} is ranked number {rank!s} out of {total_teams!s} teams. "
         message = message + "They play next in match number {next_match!s} at {next_time!s} on the {next_alliance!s} alliance. "
-        message = message + "They will be paired with teams {ally_0!s} and {ally_1!s}. "
-        message = message + "The opposing alliance will be made up of teams {opp_0!s} and {opp_1!s} and {opp_2!s}"
-
+        message = message + "They will be paired with teams {ally_0_speech!s} and {ally_1_speech!s}. "
+        message = message + "The opposing alliance will be made up of teams {opp_0_speech!s} and {opp_1_speech!s} and {opp_2_speech!s}. "
         r.say(message.format(**string_data))
-
     else:
-        string_data = dict()
-        string_data['total_teams'] = len(data.get_rankings(FIRST_EVENT, year=''))
-        string_data['team_num'] = number_to_speech(message)
-        string_data['record'] = info['ranking']['record']
-        string_data['rank'] = info['ranking']['rank']
-
-        message = "Team {team_num!s} is ranked #{rank!s} out of {total_teams!s}. "
+        message = "Team {team_num_speech!s} is ranked {rank!s} out of {total_teams!s}. "
         message = message + "They aren't listed as playing any more matches. "
-        message = message + "This usually means that the aren't playing in elimination matches."
-
+        message = message + "This usually means that the aren't playing in elimination matches. "
         r.say(message.format(**string_data))
 
+    if info['last_match']:
+        message = "Team {team_num!s} {result!s} match {match_num!s}, {score!s}."
+        
     r.say('Goodbye')
     r.hangup()
-    return str(r)
+    return ster(r)
 
 
 @app.route('/sms', methods=['POST'])
@@ -117,57 +87,20 @@ def sms():
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
     if re.search('^\d{0,4}$', message):
         info = data.get_full_team_info(int(message), FIRST_EVENT)
-
+        string_data = get_words(int(message), info)
         if info['matches'] == []:
             r.sms('Either team ' + message + ' isn\'t registered for this event, or FIRST hasn\'t published match data yet. ('+FIRST_EVENT+')')
-
         elif info['next_match']:
-            string_data = dict()
-            string_data['team_num'] = message
-            string_data['record'] = team_record(message, info['matches'])
-            string_data['rank'] = info['ranking']['rank']
-            string_data['next_match'] = info['next_match']['number']
-            string_data['next_time'] = info['next_match']['time'].strftime('%I:%M %p')
-
-            if int(message) in info['next_match']['red']:
-                string_data['next_alliance'] = 'red'
-                opp_alliance = 'blue'
-            else:
-                string_data['next_alliance'] = 'blue'
-                opp_alliance = 'red'
-
-            allies = info['next_match'][string_data['next_alliance']]
-            allies.remove(int(message))
-            opps = info['next_match'][opp_alliance]
-
-            string_data['ally_0'] = allies[0]
-            string_data['ally_1'] = allies[1]
-            string_data['opp_0'] = opps[0]
-            string_data['opp_1'] = opps[1]
-            string_data['opp_2'] = opps[2]
-            string_data['total_teams'] = len(data.get_rankings(FIRST_EVENT, year=''))
-
             message = "Team {team_num!s} ({record!s}) is ranked #{rank!s}/{total_teams!s}. "
             message = message + "They play next in match {next_match!s} ({next_time!s}) on the {next_alliance!s} alliance "
             message = message + "(w/ {ally_0!s}, {ally_1!s}; vs {opp_0!s}, {opp_1!s}, {opp_2!s})."
-
             r.sms(message.format(**string_data))
-
         else:
-            string_data = dict()
-            string_data['total_teams'] = len(data.get_rankings(FIRST_EVENT, year=''))
-            string_data['team_num'] = message
-            string_data['record'] = team_record(message, info['matches'])
-            string_data['rank'] = info['ranking']['rank']
-            string_data['last_num'] = info['last_match']['number']
-
             message = "Team {team_num!s} ({record!s}) is ranked #{rank!s}/{total_teams!s}. "
             message = message + "They\'re not on the schedule to play anymore matches. "
             message = message + "They played last in match {last_num!s}."
-
             r.sms(message.format(**string_data))
 
-        return str(r)
     elif re.search('^\d{0,4} last$', message):
         num = re.search('^(\d{0,4}) last$', message).group(1)
         info = data.get_full_team_info(int(num), FIRST_EVENT)
@@ -175,35 +108,10 @@ def sms():
         if info['last_match'] == None:
             r.sms('Team ' + num + ' hasn\'t played any matches yet. ('+FIRST_EVENT+')')
         else:
-            string_data = dict()
-            string_data['team_num'] = num
-            string_data['match_num'] = info['last_match']['number']
-            string_data['record'] = team_record(int(num), info['matches'])
-            if int(num) in info['last_match']['red']:
-                if info['last_match']['red_score'] > info['last_match']['blue_score']:
-                    string_data['result'] = 'won'
-                    string_data['score'] = str(info['last_match']['red_score']) + '-' + str(info['last_match']['blue_score'])
-                elif info['last_match']['red_score'] < info['last_match']['blue_score']:
-                    string_data['result'] = 'lost'
-                    string_data['score'] = str(info['last_match']['blue_score']) + '-' + str(info['last_match']['red_score'])
-                else:
-                    string_data['result'] = 'tied'
-                    string_data['score'] = str(info['last_match']['blue_score']) + '-' + str(info['last_match']['red_score'])
-            else:
-                if info['last_match']['red_score'] < info['last_match']['blue_score']:
-                    string_data['result'] = 'won'
-                    string_data['score'] = str(info['last_match']['red_score']) + '-' + str(info['last_match']['blue_score'])
-                elif info['last_match']['red_score'] > info['last_match']['blue_score']:
-                    string_data['result'] = 'lost'
-                    string_data['score'] = str(info['last_match']['blue_score']) + '-' + str(info['last_match']['red_score'])
-                else:
-                    string_data['result'] = 'tied'
-                    string_data['score'] = str(info['last_match']['blue_score']) + '-' + str(info['last_match']['red_score'])
-
-            message = "Team {team_num!s}({record!s}) {result!s} in match {match_num!s}, {score!s}."
+            string_data = get_words(num, info)
+            message = "Team {team_num!s}({record!s}) {result!s} match {match_num!s}, {score!s}."
             r.sms(message.format(**string_data))
 
-        return str(r)
     elif message == 'harvest':
         try:
             data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
@@ -213,11 +121,76 @@ def sms():
             message = "Something went wrong with the harvest."
 
         r.sms(message)
-        return str(r)
 
     else:
         r.sms('Text a team number for information about that team, including upcoming matches. Follow it with \'last\' to see results from the last match.')
-        return str(r)
+
+    return str(r)
+
+def get_words(team_number, team_data):
+        data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
+        string_data = dict()
+
+        string_data['team_num'] = team_number
+        string_data['team_num_speech'] = number_to_speech(team_number)
+
+        string_data['total_teams'] = len(data.get_rankings(FIRST_EVENT, year=''))
+
+        string_data['record'] = team_record(team_number, team_data['matches'])
+        string_data['rank'] = team_data['ranking']['rank']
+
+        if team_data['last_match']:
+            string_data['last_num'] = team_data['last_match']['number']
+            string_data['match_num'] = team_data['last_match']['number']
+            if int(team_number) in team_data['last_match']['red']:
+                if team_data['last_match']['red_score'] > team_data['last_match']['blue_score']:
+                    string_data['result'] = 'won'
+                    string_data['score'] = str(team_data['last_match']['red_score']) + '-' + str(team_data['last_match']['blue_score'])
+                elif info['last_match']['red_score'] < info['last_match']['blue_score']:
+                    string_data['result'] = 'lost'
+                    string_data['score'] = str(team_data['last_match']['blue_score']) + '-' + str(team_data['last_match']['red_score'])
+                else:
+                    string_data['result'] = 'tied'
+                    string_data['score'] = str(team_data['last_match']['blue_score']) + '-' + str(team_data['last_match']['red_score'])
+            else:
+                if team_data['last_match']['red_score'] < team_data['last_match']['blue_score']:
+                    string_data['result'] = 'won'
+                    string_data['score'] = str(team_data['last_match']['red_score']) + '-' + str(team_data['last_match']['blue_score'])
+                elif info['last_match']['red_score'] > team_data['last_match']['blue_score']:
+                    string_data['result'] = 'lost'
+                    string_data['score'] = str(team_data['last_match']['blue_score']) + '-' + str(team_data['last_match']['red_score'])
+                else:
+                    string_data['result'] = 'tied'
+                    string_data['score'] = str(team_data['last_match']['blue_score']) + '-' + str(team_data['last_match']['red_score'])
+
+        if team_data['next_match']:
+            string_data['next_match'] = team_data['next_match']['number']
+            string_data['next_time'] = team_data['next_match']['time'].strftime('%I:%M %p')
+
+            if int(team_number) in team_data['next_match']['red']:
+                string_data['next_alliance'] = 'red'
+                opp_alliance = 'blue'
+            else:
+                string_data['next_alliance'] = 'blue'
+                opp_alliance = 'red'
+
+            allies = team_data['next_match'][string_data['next_alliance']]
+            allies.remove(int(team_number))
+            opps = team_data['next_match'][opp_alliance]
+
+            string_data['ally_0'] = allies[0]
+            string_data['ally_1'] = allies[1]
+            string_data['opp_0'] = opps[0]
+            string_data['opp_1'] = opps[1]
+            string_data['opp_2'] = opps[2]
+        
+            string_data['ally_0_speech'] = number_to_speech(allies[0])
+            string_data['ally_1_speech'] = number_to_speech(allies[1])
+            string_data['opp_0_speech'] = number_to_speech(opps[0])
+            string_data['opp_1_speech'] = number_to_speech(opps[1])
+            string_data['opp_2_speech'] = number_to_speech(opps[2])
+
+        return string_data
 
 def team_record(team_number, matches, return_string=True):
     record = dict()
