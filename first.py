@@ -66,11 +66,17 @@ def gather():
         message = message + "They will be paired with teams {ally_0_speech!s} and {ally_1_speech!s}. "
         message = message + "The opposing alliance will be made up of teams {opp_0_speech!s} and {opp_1_speech!s} and {opp_2_speech!s}. "
         r.say(message.format(**string_data))
-    else:
+    elif data.count_elimination_matches(FIRST_EVENT) > 0:
         message = "Team {team_num_speech!s} is ranked {rank!s} out of {total_teams!s}. "
-        message = message + "They aren't listed as playing any more matches. "
+        message = message + "They aren't listed as playing any more matches and elimination matches have been scheduled. "
         message = message + "This usually means that the aren't playing in elimination matches. "
         r.say(message.format(**string_data))
+
+    else data.count_elimination_matches(FIRST_EVENT) == 0:
+        message = "Team {team_num_speech!s} is ranked {rank!s} out of {total_teams!s}. "
+        message = message + "They aren't listed as playing any more matches, but data isn't yet available for elimination matches. "
+        message = message + "Check back later to find out if they're playing again. "
+        r.say(message.format(**string_data)) 
 
     if info['last_match']:
         message = "In their last match, number {match_num!s}, team {team_num_speech!s} {result!s}, {score!s}. "

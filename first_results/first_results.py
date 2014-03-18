@@ -107,7 +107,7 @@ class first_results:
                 for tr in tables[3].findAll('tr')[3:]:
                     match = dict()
                     tds = tr.findAll('td')
-                    if tds[0].string != None:
+                    if tds[3].string != None:
                         match['time'] = datetime.strptime(tds[0].string + ' ' + current_date.strftime('%d/%m/%Y'), '%I:%M %p %d/%m/%Y')
                         if match['time'].strftime('%p') == 'AM' and  meridian == 'PM':
                             current_date = current_date + timedelta(days=1)
@@ -200,6 +200,9 @@ class first_results:
             return None
         else:
             return unplayed_matches[0]
+
+    def count_elimination_matches(event):
+        return len(list(self.db.matches.find({'$and': [ {'event': event}, {'type', 'E'} ] })))
 
     def get_last_team_match(self, team, event):
         played_matches = list(self.db.matches.find({'$and': [ { '$or': [ { 'red': {'$in': [team]} },{ 'blue': { '$in': [team]} } ] }, {'event': event}, {'red_score': {'$gt': -1}}] }).sort('time', -1))
