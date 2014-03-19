@@ -3,7 +3,6 @@ import requests
 from datetime import datetime, timedelta
 import re
 import pymongo
-import pprint
 
 class first_results:
 
@@ -136,6 +135,14 @@ class first_results:
             event_info = requests.get(url, headers={'X-TBA-App-Id': 'frc1137:database_populator:0.0.1'})
             event_info = event_info.json()
 
+            teams = []
+            registrant_url = 'http://www.thebluealliance.com/api/v2/event/' + str(year) + event + '/teams'
+            event_teams = requests.get(registrant_url, headers={'X-TBA-App-Id': 'frc1137:database_populator:0.0.1'})
+            event_teams = event_teams.json()
+            
+            for event_team in event_teams:
+                teams.append(event_team['team_number'])
+
             date_format = '%Y-%m-%dT%H:%M:%S'
             event = dict()
             event['code'] = ''.join(event_info['event_code'])
@@ -143,14 +150,15 @@ class first_results:
             event['name'] = event_info['name']
             event['_id'] = event_info['key']
             event['type'] = event_info['event_type_string']
-            event['start'] = datetime.strptime(event_info['start_date'], date_format) + timedelta(hours=8)
-            event['end'] = datetime.strptime(event_info['end_date'], date_format) + timedelta(hours=18, minutes=30)
+            event['start'] = datetime.strptime(event_info['start_date'], date_format) + timedelta(hours=-24)
+            event['end'] = datetime.strptime(event_info['end_date'], date_format) + timedelta(hours=23, minutes=59)
+            event['teams'] = teams
             events.update({'_id': event['_id']}, event, upsert=True)
             return event
         else:
             return events.find_one({'_id': str(year)+event})
-       
-    def get_events(self, year=2014, from_web=False, active=True):
+      
+    def get_events(self, year=None, from_web=False, active=True):
         if from_web:
             # Get event codes from The Blue Alliance website
             url = 'http://www.thebluealliance.com/api/v2/events/2014'
@@ -202,7 +210,10 @@ class first_results:
             return unplayed_matches[0]
 
     def count_elimination_matches(self, event):
-        elimination_matches = list(self.db.matches.find({'$and': [ {'event': event}, {'match_type': 'E'} ] }))
+        if event:
+            elimination_matches = list(self.db.matches.find({'$and': [ {'event': event['_id']}, {'match_type': 'E'} ] }))
+        else:
+            elimination_matches = []
         return len(elimination_matches)
 
     def get_last_team_match(self, team, event):
@@ -212,11 +223,34 @@ class first_results:
         else:
             return played_matches[0]
 
-    def get_full_team_info(self, team, event):
+    def get_current_events(self):
+        events = self.db.events
+        right_now = datetime.now()
+        match = list(events.find({'start': { '$lte': right_now }, 'end': { '$gte': right_now} }))
+        return match
+
+    def find_current_team_event(self, team):
+        events = self.db.events
+        right_now = datetime.now()
+        match = events.find_one({'start': { '$lte': right_now }, 'end': { '$gte': right_now}, 'teams': {'$in': [team]} })
+        return match
+
+    def get_full_team_info(self, team, event=None):
+        if event == None:
+            event = self.find_current_team_event(team)
+
         info = dict()
-        info['ranking'] = self.get_team_ranking(team, event)
-        info['matches'] = self.get_team_matches(team, event)
-        info['next_match'] = self.get_next_team_match(team, event)
-        info['last_match'] = self.get_last_team_match(team, event)
+        if event == None:
+            info['event'] = event
+            info['ranking'] = None
+            info['matches'] = []
+            info['next_match'] = None
+            info['last_match'] = None
+        else:
+            info['event'] = event
+            info['ranking'] = self.get_team_ranking(team, event['_id'])
+            info['matches'] = self.get_team_matches(team, event['_id'])
+            info['next_match'] = self.get_next_team_match(team, event['_id'])
+            info['last_match'] = self.get_last_team_match(team, event['_id'])
         return info
 

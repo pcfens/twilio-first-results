@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Rankings before Elimination Rounds</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <h1>Rankings before Elimination Rounds</h1>
+  <table cellspacing="0" border="1">
+    <tr>
+      <th>Rank</th>
+      <th>Team Number</th>
+      <th>Record</th>
+    </tr>
+    {%- for team in rankings %}
+    <tr>
+      <td>{{team.rank}}</td>
+      <td><a href="{{ url_for('get_team_stats', team_number=team.team) }}">{{team.team}}</a></td>
+      <td>{{team.record}}</td>
+    </tr>
+    {%- endfor %}
+  </table>
+</body>
+</html>

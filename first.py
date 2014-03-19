@@ -1,6 +1,7 @@
 import os
 from flask import Flask, abort, request, render_template
 import re
+from datetime import datetime
 from twilio import twiml
 
 from first_results import first_results
@@ -11,23 +12,28 @@ app = Flask(__name__, static_url_path='/static')
 @app.route('/')
 def index():
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
-    event_data = data.get_event_data(FIRST_EVENT, year='')
-    return render_template('index.html', event=event_data)
+    return render_template('index.html')
 
 @app.route('/<int:team_number>')
 def get_team_stats(team_number):
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
-    info = data.get_full_team_info(team_number, FIRST_EVENT)
+    info = data.get_full_team_info(team_number)
     if info['ranking']:
         return render_template('team_stats.html', info=info, team_number=team_number, record=team_record(team_number, info['matches']))
     else:
-        return "Data for team " + str(team_number) + " isn't available for this event (" + FIRST_EVENT + ")"
+        return "Team " + str(team_number) + " isn't active anywhere right now."
 
 @app.route('/rankings')
-def rankings():
+def all_rankings():
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
-    rankings = data.get_rankings(FIRST_EVENT, year='')
-    return render_template('rankings.html', rankings=rankings)
+    events = data.get_current_events()
+    return render_template('rankings.html', current_events=events)
+
+@app.route('/rankings/<string:event>')
+def event_rankings(event):
+    data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
+    rankings = data.get_rankings(event, year=datetime.now().year)
+    return render_template('event_rankings.html', rankings=rankings)
 
 @app.route('/harvest-all')
 def harvest_all():
@@ -64,13 +70,17 @@ def process_call():
     r.pause()
     message = request.form['Digits']
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
-    info = data.get_full_team_info(int(message), FIRST_EVENT)
-    elim_matches = data.count_elimination_matches(FIRST_EVENT)
-    string_data = get_words(int(message), info)
+    info = data.get_full_team_info(int(message))
+    elim_matches = data.count_elimination_matches(info['event'])
 
     if info['matches'] == []:
-        r.say('There isn\'t any current information published about team ' + number_to_speech(message) )
+        if info['event']:
+            r.say('FIRST hasn\'t yet published a schedule for the ' + info['event']['name'] + '. ')
+        else:
+            r.say('Team ' + number_to_speech(message) + ' isn\'t registered to play soon. ')
+
     elif info['next_match']:
+        string_data = get_words(int(message), info)
         message = "Team {team_num_speech!s} is ranked number {rank!s} out of {total_teams!s} teams. "
         message = message + "They play next in match number {next_match!s} at {next_time!s} on the {next_alliance!s} alliance. "
         message = message + "They will be paired with teams {ally_0_speech!s} and {ally_1_speech!s}. "
@@ -78,12 +88,13 @@ def process_call():
         r.say(message.format(**string_data))
 
     elif elim_matches > 0:
+        string_data = get_words(int(message), info)
         message = "Team {team_num_speech!s} is ranked {rank!s} out of {total_teams!s}. "
-        message = message + "They aren't listed as playing any more matches and elimination matches have been scheduled. "
-        message = message + "This usually means that the aren't playing in elimination matches. "
+        message = message + "They have either already been eliminated, or were not chosen to be in an alliance. "
         r.say(message.format(**string_data))
 
     elif elim_matches == 0:
+        string_data = get_words(message, info)
         message = "Team {team_num_speech!s} is ranked {rank!s} out of {total_teams!s}. "
         message = message + "They aren't listed as playing any more matches, but data isn't yet available for elimination matches. "
         message = message + "Check back later to find out if they're playing again. "
@@ -104,22 +115,27 @@ def sms():
     message = request.form['Body'].lower()
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
     if re.search('^\d{0,4}$', message):
-        info = data.get_full_team_info(int(message), FIRST_EVENT)
-    	elim_matches = data.count_elimination_matches(FIRST_EVENT)
-        string_data = get_words(int(message), info)
+        info = data.get_full_team_info(int(message))
+    	elim_matches = data.count_elimination_matches(info['event'])
         if info['matches'] == []:
-            r.sms('Either team ' + message + ' isn\'t registered for this event, or FIRST hasn\'t published match data yet. ('+FIRST_EVENT+')')
+            if info['event']:
+                r.sms('FIRST hasn\'t yet published a schedule for the ' + info['event']['name'] + '.')
+            else:
+                r.sms('Team ' + message + ' isn\'t registered to play soon.')
         elif info['next_match']:
+            string_data = get_words(int(message), info)
             message = "Team {team_num!s} ({record!s}) is ranked #{rank!s}/{total_teams!s}. "
             message = message + "They play next in match {next_match!s} ({next_time!s}) on the {next_alliance!s} alliance "
             message = message + "(w/ {ally_0!s}, {ally_1!s}; vs {opp_0!s}, {opp_1!s}, {opp_2!s})."
             r.sms(message.format(**string_data))
         elif elim_matches > 0:
+            string_data = get_words(int(message), info)
             message = "Team {team_num!s} ({record!s}) is ranked #{rank!s}/{total_teams!s}. "
             message = message + "They\'re not on the schedule to play anymore matches. "
             message = message + "Elimination rounds have already been scheduled."
             r.sms(message.format(**string_data))
         elif elim_matches == 0:
+            string_data = get_words(int(message), info)
             message = "Team {team_num!s} ({record!s}) is ranked #{rank!s}/{total_teams!s}. "
             message = message + "They\'re not on the schedule to play anymore matches. "
             message = message + "Elimination rounds have not been scheduled."
@@ -127,10 +143,10 @@ def sms():
 
     elif re.search('^\d{0,4} last$', message):
         num = re.search('^(\d{0,4}) last$', message).group(1)
-        info = data.get_full_team_info(int(num), FIRST_EVENT)
+        info = data.get_full_team_info(int(num))
 
         if info['last_match'] == None:
-            r.sms('Team ' + num + ' hasn\'t played any matches yet. ('+FIRST_EVENT+')')
+            r.sms('Team ' + num + ' hasn\'t played any matches yet. ('+info['event']+')')
         else:
             string_data = get_words(num, info)
             message = "Team {team_num!s}({record!s}) {result!s} match {match_num!s}, {score!s}."
@@ -158,7 +174,7 @@ def get_words(team_number, team_data):
         string_data['team_num'] = team_number
         string_data['team_num_speech'] = number_to_speech(team_number)
 
-        string_data['total_teams'] = len(data.get_rankings(FIRST_EVENT, year=''))
+        string_data['total_teams'] = len(data.get_rankings(team_data['event']['_id'], year=''))
 
         string_data['record'] = team_record(team_number, team_data['matches'])
         string_data['rank'] = team_data['ranking']['rank']
@@ -166,11 +182,11 @@ def get_words(team_number, team_data):
         if team_data['last_match']:
             string_data['last_num'] = team_data['last_match']['number']
             string_data['match_num'] = team_data['last_match']['number']
-            if int(team_number) in team_data['last_match']['red']:
+            if team_number in team_data['last_match']['red']:
                 if team_data['last_match']['red_score'] > team_data['last_match']['blue_score']:
                     string_data['result'] = 'won'
                     string_data['score'] = str(team_data['last_match']['red_score']) + '-' + str(team_data['last_match']['blue_score'])
-                elif info['last_match']['red_score'] < info['last_match']['blue_score']:
+                elif team_data['last_match']['red_score'] < team_data['last_match']['blue_score']:
                     string_data['result'] = 'lost'
                     string_data['score'] = str(team_data['last_match']['blue_score']) + '-' + str(team_data['last_match']['red_score'])
                 else:
@@ -180,7 +196,7 @@ def get_words(team_number, team_data):
                 if team_data['last_match']['red_score'] < team_data['last_match']['blue_score']:
                     string_data['result'] = 'won'
                     string_data['score'] = str(team_data['last_match']['red_score']) + '-' + str(team_data['last_match']['blue_score'])
-                elif info['last_match']['red_score'] > team_data['last_match']['blue_score']:
+                elif team_data['last_match']['red_score'] > team_data['last_match']['blue_score']:
                     string_data['result'] = 'lost'
                     string_data['score'] = str(team_data['last_match']['blue_score']) + '-' + str(team_data['last_match']['red_score'])
                 else:
@@ -222,7 +238,7 @@ def team_record(team_number, matches, return_string=True):
     record['losses'] = 0
     record['ties'] = 0
     for match in matches:
-        if int(team_number) in match['red']:
+        if team_number in match['red']:
             if int(match['red_score']) > int(match['blue_score']):
                 record['wins'] += 1
             elif int(match['red_score']) < int(match['blue_score']):
