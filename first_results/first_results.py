@@ -96,7 +96,7 @@ class first_results:
                     match['blue'] = [int(tds[5].string), int(tds[6].string), int(tds[7].string)]
                     match['red_score'] = int(tds[8].string) if tds[8].string != None else -1
                     match['blue_score'] = int(tds[9].string) if tds[9].string != None else -1
-                    match['type'] = 'Q'
+                    match['match_type'] = 'Q'
                     match['_id'] = str(year) + '-' + event + '-' + str(match['number'])
                     matches.update({'_id': match['_id']}, match, upsert=True)
                     match_list.append(match)
@@ -119,7 +119,7 @@ class first_results:
                         match['blue'] = [int(tds[6].string), int(tds[7].string), int(tds[8].string)]
                         match['red_score'] = int(tds[9].string) if tds[9].string != None else -1
                         match['blue_score'] = int(tds[10].string) if tds[10].string != None else -1
-                        match['type'] = 'E'
+                        match['match_type'] = 'E'
                         match['_id'] = str(year) + '-' + event + '-' + str(match['number'])
                         matches.update({'_id': match['_id']}, match, upsert=True)
                         match_list.append(match)
@@ -201,8 +201,9 @@ class first_results:
         else:
             return unplayed_matches[0]
 
-    def count_elimination_matches(event):
-        return len(list(self.db.matches.find({'$and': [ {'event': event}, {'type', 'E'} ] })))
+    def count_elimination_matches(self, event):
+        elimination_matches = list(self.db.matches.find({'$and': [ {'event': event}, {'match_type': 'E'} ] }))
+        return len(elimination_matches)
 
     def get_last_team_match(self, team, event):
         played_matches = list(self.db.matches.find({'$and': [ { '$or': [ { 'red': {'$in': [team]} },{ 'blue': { '$in': [team]} } ] }, {'event': event}, {'red_score': {'$gt': -1}}] }).sort('time', -1))
