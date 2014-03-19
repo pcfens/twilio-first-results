@@ -1,7 +1,10 @@
 import os
 from flask import Flask, abort, request, render_template
 import re
+from datetime import datetime
 from twilio import twiml
+
+import pprint
 
 from first_results import first_results
 from local_settings import *
@@ -11,22 +14,21 @@ app = Flask(__name__, static_url_path='/static')
 @app.route('/')
 def index():
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
-    event_data = data.get_event_data(FIRST_EVENT, year='')
-    return render_template('index.html', event=event_data)
+    return render_template('index.html')
 
 @app.route('/<int:team_number>')
 def get_team_stats(team_number):
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
-    info = data.get_full_team_info(team_number, FIRST_EVENT)
+    info = data.get_full_team_info(team_number)
     if info['ranking']:
         return render_template('team_stats.html', info=info, team_number=team_number, record=team_record(team_number, info['matches']))
     else:
-        return "Data for team " + str(team_number) + " isn't available for this event (" + FIRST_EVENT + ")"
+        return "Team " + str(team_number) + " isn't active anywhere right now."
 
-@app.route('/rankings')
-def rankings():
+@app.route('/rankings/<string:event>')
+def rankings(event):
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
-    rankings = data.get_rankings(FIRST_EVENT, year='')
+    rankings = data.get_rankings(event, year=datetime.now().year)
     return render_template('rankings.html', rankings=rankings)
 
 @app.route('/harvest-all')
@@ -64,8 +66,8 @@ def process_call():
     r.pause()
     message = request.form['Digits']
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
-    info = data.get_full_team_info(int(message), FIRST_EVENT)
-    elim_matches = data.count_elimination_matches(FIRST_EVENT)
+    info = data.get_full_team_info(int(message))
+    elim_matches = data.count_elimination_matches(info['event'])
     string_data = get_words(int(message), info)
 
     if info['matches'] == []:
@@ -104,11 +106,11 @@ def sms():
     message = request.form['Body'].lower()
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
     if re.search('^\d{0,4}$', message):
-        info = data.get_full_team_info(int(message), FIRST_EVENT)
-    	elim_matches = data.count_elimination_matches(FIRST_EVENT)
+        info = data.get_full_team_info(int(message))
         string_data = get_words(int(message), info)
+    	elim_matches = data.count_elimination_matches(info['event'])
         if info['matches'] == []:
-            r.sms('Either team ' + message + ' isn\'t registered for this event, or FIRST hasn\'t published match data yet. ('+FIRST_EVENT+')')
+            r.sms('Either team ' + message + ' isn\'t registered for any active events, or FIRST hasn\'t published match data yet.')
         elif info['next_match']:
             message = "Team {team_num!s} ({record!s}) is ranked #{rank!s}/{total_teams!s}. "
             message = message + "They play next in match {next_match!s} ({next_time!s}) on the {next_alliance!s} alliance "
@@ -127,10 +129,10 @@ def sms():
 
     elif re.search('^\d{0,4} last$', message):
         num = re.search('^(\d{0,4}) last$', message).group(1)
-        info = data.get_full_team_info(int(num), FIRST_EVENT)
+        info = data.get_full_team_info(int(num))
 
         if info['last_match'] == None:
-            r.sms('Team ' + num + ' hasn\'t played any matches yet. ('+FIRST_EVENT+')')
+            r.sms('Team ' + num + ' hasn\'t played any matches yet. ('+info['event']+')')
         else:
             string_data = get_words(num, info)
             message = "Team {team_num!s}({record!s}) {result!s} match {match_num!s}, {score!s}."
@@ -158,7 +160,7 @@ def get_words(team_number, team_data):
         string_data['team_num'] = team_number
         string_data['team_num_speech'] = number_to_speech(team_number)
 
-        string_data['total_teams'] = len(data.get_rankings(FIRST_EVENT, year=''))
+        string_data['total_teams'] = len(data.get_rankings(info['event'], year=''))
 
         string_data['record'] = team_record(team_number, team_data['matches'])
         string_data['rank'] = team_data['ranking']['rank']
