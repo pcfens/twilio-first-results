@@ -29,11 +29,20 @@ def rankings():
     rankings = data.get_rankings(FIRST_EVENT, year='')
     return render_template('rankings.html', rankings=rankings)
 
-@app.route('/harvest')
-def harvest():
+@app.route('/harvest-all')
+def harvest_all():
     try:
         data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
         data.fetch_all_data(get_events=True)
+        return 'All fetched'
+    except:
+        abort(500)
+
+@app.route('/harvest')
+def harvest_optimized():
+    try:
+        data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
+        data.fetch_all_data()
         return 'All fetched'
     except:
         abort(500)
