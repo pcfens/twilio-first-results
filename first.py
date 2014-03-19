@@ -69,7 +69,7 @@ def process_call():
     string_data = get_words(int(message), info)
 
     if info['matches'] == []:
-        r.say('It looks like team ' + number_to_speech(message) + ' isn\'t registered for this event ('+FIRST_EVENT+')')
+        r.say('There isn\'t any current information published about team ' + number_to_speech(message) )
     elif info['next_match']:
         message = "Team {team_num_speech!s} is ranked number {rank!s} out of {total_teams!s} teams. "
         message = message + "They play next in match number {next_match!s} at {next_time!s} on the {next_alliance!s} alliance. "
