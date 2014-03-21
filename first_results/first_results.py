@@ -197,6 +197,7 @@ class first_results:
         elif active:
             events = self.db.events
             right_now = datetime.now()
+            #right_now = datetime(2014, 3, 14, 15, 30)
             event_list = list(events.find({'start': { '$lte': right_now }, 'end': { '$gte': right_now} }))
             event_codes = []
             for event in event_list:
@@ -251,12 +252,14 @@ class first_results:
     def get_current_events(self):
         events = self.db.events
         right_now = datetime.now()
+        #right_now = datetime(2014, 3, 14, 15, 30)
         match = list(events.find({'start': { '$lte': right_now }, 'end': { '$gte': right_now} }))
         return match
 
     def find_current_team_event(self, team):
         events = self.db.events
         right_now = datetime.now()
+        #right_now = datetime(2014, 3, 14, 15, 30)
         event = events.find_one({'start': { '$lte': right_now }, 'end': { '$gte': right_now}, 'teams': {'$in': [team]} })
         return event
 
