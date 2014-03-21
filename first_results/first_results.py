@@ -3,7 +3,7 @@ import requests
 from datetime import datetime, timedelta
 import re
 import pymongo
-
+import pprint
 class first_results:
 
     def __init__(self, uri, collection):
@@ -53,19 +53,22 @@ class first_results:
         matches = []
         matches = self.db.matches
         if from_web:
-            qual_url = 'http://www2.usfirst.org/' + str(year) + 'comp/events/' + event + '/matchresults.html'
+            sched_url = 'http://www2.usfirst.org/' + str(year) + 'comp/events/' + event + '/schedulequal.html'
+            qual_url  = 'http://www2.usfirst.org/' + str(year) + 'comp/events/' + event + '/matchresults.html'
             try:
                 page = requests.get(qual_url)
+                sched_page = requests.get(sched_url)
+                sched_page.raise_for_status()
                 page.raise_for_status()
-            except requests.exceptions.HTTPError:
+            except:
                 return None
 
             soup = BeautifulSoup(page.content)
-
+            sched_soup = BeautifulSoup(sched_page.content)
+            sched_table = sched_soup.findAll('table')[2]
             tables = soup.findAll('table')
 
             date_range = tables[1].findAll('tr')[0].findAll('td')[1].findAll('p')[0].string
-
             start_date = datetime.strptime(date_range.split('-', 1)[0].strip(), '%m/%d/%Y')
             end_date = datetime.strptime(date_range.split('-', 1)[1].strip(), '%m/%d/%Y')
 
@@ -78,7 +81,28 @@ class first_results:
 
             meridian = None
 
-            match_list = []
+            match_list = dict()
+            for tr in sched_table.findAll('tr')[2:]:
+                match=dict()
+                tds = tr.findAll('td')
+                if tds[0].string != None:
+                    match['time'] = datetime.strptime(tds[0].string + ' ' + current_date.strftime('%d/%m/%Y'), '%I:%M %p %d/%m/%Y')
+                    if match['time'].strftime('%p') == 'AM' and  meridian == 'PM':
+                        current_date = current_date + timedelta(days=1)
+                        match['time'] = datetime.strptime(tds[0].string + ' ' + current_date.strftime('%d/%m/%Y'), '%I:%M %p %d/%m/%Y')
+                    meridian = match['time'].strftime('%p')
+                    match['event'] = match['time'].strftime('%Y') + event
+
+                    match['number'] = int(tds[1].string)
+                    match['red'] = [int(tds[2].string), int(tds[3].string), int(tds[4].string)]
+                    match['blue'] = [int(tds[5].string), int(tds[6].string), int(tds[7].string)]
+                    match['red_score'] = -1
+                    match['blue_score'] = -1
+                    match['match_type'] = 'Q'
+                    match['_id'] = str(year) + '-' + event + '-' + str(match['number'])
+                    match_list[match['_id']] = match
+
+
             for tr in results_table.findAll('tr')[2:]:
                 match = dict()
                 tds = tr.findAll('td')
@@ -97,8 +121,7 @@ class first_results:
                     match['blue_score'] = int(tds[9].string) if tds[9].string != None else -1
                     match['match_type'] = 'Q'
                     match['_id'] = str(year) + '-' + event + '-' + str(match['number'])
-                    matches.update({'_id': match['_id']}, match, upsert=True)
-                    match_list.append(match)
+                    match_list[match['_id']] = match
 
             meridian = None
 
@@ -120,8 +143,10 @@ class first_results:
                         match['blue_score'] = int(tds[10].string) if tds[10].string != None else -1
                         match['match_type'] = 'E'
                         match['_id'] = str(year) + '-' + event + '-' + str(match['number'])
-                        matches.update({'_id': match['_id']}, match, upsert=True)
-                        match_list.append(match)
+                        match_list[match['_id']] = match
+
+            for key, match in match_list.iteritems():
+                matches.update({'_id': match['_id']}, match, upsert=True)
 
             return match_list
         else:
@@ -187,7 +212,7 @@ class first_results:
 
     def fetch_all_data(self, get_events=False, year=2014):
     	if get_events:
-	    event_codes = self.get_events(year=year, from_web=True)
+            event_codes = self.get_events(year=year, from_web=True)
         else:
             event_codes = self.get_events(year=year, active=True)
 
@@ -232,13 +257,14 @@ class first_results:
     def find_current_team_event(self, team):
         events = self.db.events
         right_now = datetime.now()
-        match = events.find_one({'start': { '$lte': right_now }, 'end': { '$gte': right_now}, 'teams': {'$in': [team]} })
-        return match
+        event = events.find_one({'start': { '$lte': right_now }, 'end': { '$gte': right_now}, 'teams': {'$in': [team]} })
+        return event
 
     def get_full_team_info(self, team, event=None):
         if event == None:
             event = self.find_current_team_event(team)
-
+        else:
+            event = self.get_event_data(event, year='')
         info = dict()
         if event == None:
             info['event'] = event

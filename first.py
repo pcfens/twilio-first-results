@@ -3,7 +3,7 @@ from flask import Flask, abort, request, render_template
 import re
 from datetime import datetime
 from twilio import twiml
-
+import pprint
 from first_results import first_results
 from local_settings import *
 
@@ -18,7 +18,8 @@ def index():
 def get_team_stats(team_number):
     data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
     info = data.get_full_team_info(team_number)
-    if info['ranking']:
+    pprint.pprint(info)
+    if info['ranking'] or info['matches']:
         return render_template('team_stats.html', info=info, team_number=team_number, record=team_record(team_number, info['matches']))
     else:
         return "Team " + str(team_number) + " isn't active anywhere right now."
@@ -40,9 +41,9 @@ def harvest_all():
     try:
         data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
         data.fetch_all_data(get_events=True)
-        return 'All fetched'
     except:
-        abort(500)
+        return 'Something Broke'
+    return 'All fetched'
 
 @app.route('/harvest')
 def harvest_optimized():
@@ -78,6 +79,14 @@ def process_call():
             r.say('FIRST hasn\'t yet published a schedule for the ' + info['event']['name'] + '. ')
         else:
             r.say('Team ' + number_to_speech(message) + ' isn\'t registered to play soon. ')
+
+    elif info['next_match'] and info['last_match'] == None:
+        string_data = get_words(int(message), info)
+        message = "Team {team_num_speech!s} has no ranking data yet. "
+        message = message + "They play next in match number {next_match!s} at {next_time!s} on the {next_alliance!s} alliance. "
+        message = message + "They will be paired with teams {ally_0_speech!s} and {ally_1_speech!s}. "
+        message = message + "The opposing alliance will be made up of teams {opp_0_speech!s} and {opp_1_speech!s} and {opp_2_speech!s}. "
+        r.say(message.format(**string_data))
 
     elif info['next_match']:
         string_data = get_words(int(message), info)
@@ -122,6 +131,12 @@ def sms():
                 r.sms('FIRST hasn\'t yet published a schedule for the ' + info['event']['name'] + '.')
             else:
                 r.sms('Team ' + message + ' isn\'t registered to play soon.')
+        elif info['next_match'] and info['last_match'] == None:
+            string_data = get_words(int(message), info)
+            message = "Team {team_num!s} ({record!s}) has no rank information yet. "
+            message = message + "They play next in match {next_match!s} ({next_time!s}) on the {next_alliance!s} alliance "
+            message = message + "(w/ {ally_0!s}, {ally_1!s}; vs {opp_0!s}, {opp_1!s}, {opp_2!s})."
+            r.sms(message.format(**string_data))
         elif info['next_match']:
             string_data = get_words(int(message), info)
             message = "Team {team_num!s} ({record!s}) is ranked #{rank!s}/{total_teams!s}. "
@@ -146,7 +161,7 @@ def sms():
         info = data.get_full_team_info(int(num))
 
         if info['last_match'] == None:
-            r.sms('Team ' + num + ' hasn\'t played any matches yet. ('+info['event']+')')
+            r.sms('Team ' + str(num) + ' hasn\'t played any matches yet.')
         else:
             string_data = get_words(num, info)
             message = "Team {team_num!s}({record!s}) {result!s} match {match_num!s}, {score!s}."
@@ -174,10 +189,11 @@ def get_words(team_number, team_data):
         string_data['team_num'] = team_number
         string_data['team_num_speech'] = number_to_speech(team_number)
 
-        string_data['total_teams'] = len(data.get_rankings(team_data['event']['_id'], year=''))
+        if team_data['ranking']:
+            string_data['total_teams'] = len(data.get_rankings(team_data['event']['_id'], year=''))
+            string_data['rank'] = team_data['ranking']['rank']
 
         string_data['record'] = team_record(team_number, team_data['matches'])
-        string_data['rank'] = team_data['ranking']['rank']
 
         if team_data['last_match']:
             string_data['last_num'] = team_data['last_match']['number']
