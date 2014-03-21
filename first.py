@@ -185,6 +185,8 @@ def sms():
 def get_words(team_number, team_data):
         data = first_results(uri=MONGO_URI, collection=MONGO_COLL)
         string_data = dict()
+        if not isinstance(team_number, int):
+            team_number = int(team_number)
 
         string_data['team_num'] = team_number
         string_data['team_num_speech'] = number_to_speech(team_number)
@@ -198,6 +200,7 @@ def get_words(team_number, team_data):
         if team_data['last_match']:
             string_data['last_num'] = team_data['last_match']['number']
             string_data['match_num'] = team_data['last_match']['number']
+            pprint.pprint(team_data['last_match'])
             if team_number in team_data['last_match']['red']:
                 if team_data['last_match']['red_score'] > team_data['last_match']['blue_score']:
                     string_data['result'] = 'won'
